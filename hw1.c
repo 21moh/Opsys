@@ -1,96 +1,101 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <string.h>
 #include <ctype.h>
 
 int hash(const char* word, int cacheSize) {
     int sum = 0;
     const char* ptr = word;
-
     while (*ptr != '\0') {
-        sum += (int)*ptr;
+        sum += (int)(*ptr);
         ptr++;
     }
-
     int index = sum % cacheSize;
     return index;
 }
 
-void printCache(const char** cache, int cacheSize) {
-    printf("Cache:\n");
-    const char** cachePtr = cache;
-    int i = 0;
-    while (i < cacheSize) {
-        if (*cachePtr != NULL) {
-            printf("index %d ==> \"%s\"\n", i, *cachePtr);
-        }
-        cachePtr++;
-        i++;
-    }
-}
-
-
 int main(int argc, char **argv) {
     if (argc != 3) {
-        fprintf(stderr, "Usage: %s cacheSize filename\n", *argv);
+        fprintf(stderr, "Usage: %s n filename\n", *argv);
         return 1;
     }
-    int cacheSize = atoi(*(argv + 1));
-    if (cacheSize <= 0) {
-        fprintf(stderr, "ERROR: Invalid cache size\n");
+    int n = atoi(*(++argv));        // integer input
+    if (n <= 0) {
+        fprintf(stderr, "Error: Invalid Cache Size.\n");
         return 1;
     }
-    FILE* file = fopen(*(argv + 2), "r");
+    char *filename = *(++argv);
+
+    FILE *file = fopen(filename, "r");
     if (file == NULL) {
-        perror("ERROR");
+        perror("Error opening the file.\n");
         return 1;
     }
-    char** cache = (char**)calloc(cacheSize, sizeof(char*));
-    if (cache == NULL) {
-        perror("ERROR");
-        fclose(file);
+    char **hash = calloc(n, sizeof(char*));
+    if (hash == NULL) {
+        perror("Memory allocation failed.\n");
         return 1;
     }
+    char *ptr;
     char *word = calloc(1000, sizeof(char));
     while (fscanf(file, "%s", word) == 1) {
-        int len = strlen(word);
-        if (len >= 2 && isalpha(*word) && isalpha(*(word + 1))) {
-            int index = hash(word, cacheSize);
-            if (*(cache + index) == NULL) {
-                *(cache + index) = (char*)calloc(len + 1, sizeof(char));
-                if (*(cache + index) == NULL) {
-                    perror("ERROR");
-                    fclose(file);
-                    for (int i = 0; i < cacheSize; i++) {
-                        free(*(cache + i));
-                    }
-                    free(cache);
-                    return 1;
-                }
-                strcpy(*(cache + index), word);
-                printf("Word \"%s\" ==> %d %ccalloc%c\n", word, index, 91, 93);
-            } else {
-                char* temp = (char*)realloc(*(cache + index), (len + 1) * sizeof(char));
-                if (temp == NULL) {
-                    perror("ERROR");
-                    fclose(file);
-                    for (int i = 0; i < cacheSize; i++) {
-                        free(*(cache + i));
-                    }
-                    free(cache);
-                    return 1;
-                }
-                *(cache + index) = temp;
-                strcpy(*(cache + index), word);
-                printf("Word \"%s\" ==> %d %crealloc%c\n", word, index, 91, 93);
+        ptr = word;
+        while (!isalpha(*ptr)) {
+            ptr++;
+        }
+        if (*ptr == '"') {
+            ptr++;
+        }
+        printf("%s", *ptr);
+        while (*ptr != '\0') {
+            if (!isalpha(*ptr)) {
+                *ptr = '\0';
+                break;
             }
+            ptr++;
+        }
+
+
+        int length = strlen(word);
+        if (length > 1) {
+            int ASCII;
+            int index;
+            ASCII = 0;
+            for (int j = 0; j < length; j++) {
+                ASCII = ASCII + *(word + j);
+            }
+            index = ASCII % n;
+            if (*(hash + index) == NULL) {
+                // print statement for calloc
+                *(hash + index) = calloc(length+1, sizeof(char));
+                strcpy(*(hash + index), word);
+                printf("Word \"%s\" ==> %d %ccalloc%c\n", word, index, 91, 93);
+            }
+            else if (*(hash + index) != NULL && strlen(*(hash + index)) == length) {
+                // nop
+                strcpy(*(hash + index), word);
+                printf("Word \"%s\" ==> %d %cnop%c\n", word, index, 91, 93);
+            }
+            else {
+                // print statement for realloc
+                *(hash + index) = realloc(*(hash + index), length+1 + sizeof(char));
+                strcpy(*(hash + index), word);
+                printf("Word \"%s\" ==> %d %crealloc%c\n", word, index, 91, 93);
+
+            }
+            
         }
     }
-    fclose(file);
-    printCache((const char**)cache, cacheSize);
-    for (int i = 0; i < cacheSize; i++) {
-        free(*(cache + i));
+    
+    printf("Cache:\n");
+    for (int i = 0; i < n; i++) {
+        printf("index %d ==> \"%s\"\n", i, *(hash + i));
+        free(*(hash + i));
     }
-    free(cache);
+    free(word);
+    free(hash);
+    fclose(file);
     return 0;
 }
