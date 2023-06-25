@@ -8,110 +8,100 @@
 
 
 bool checkQueenPlacement(char** grid, int row, int column, int m, int n) {
-	
-	//create copy grid with possible queen placement
-
-	char** copyGrid = (char**)calloc(m, sizeof(char*));
+    //create copy grid with possible queen placement
+    char** copyGrid = (char**)calloc(m, sizeof(char*));
     for (int i = 0; i < m; i++) {
-    	*(copyGrid+i) = (char*)calloc(n, sizeof(char));
+        *(copyGrid+i) = (char*)calloc(n, sizeof(char));
     }
-	for (int i = 0; i < m; i++) {
-    	for (int j = 0; j < n; j++) {
-    		*(*(copyGrid + i) + j) = *(*(grid + i) + j);
-    	}
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            *(*(copyGrid + i) + j) = *(*(grid + i) + j);
+        }
     }
-
     // check for attackers vertically |
-
-
-
     for (int i = 0; i < m; i++) {
-    	if (*(*(copyGrid + i) + column) == 'Q') {
-    		return false;
-    	}
+        if (*(*(copyGrid + i) + column) == 'Q') {
+            return false;
+        }
     }
     // check for attackers horizontally ---
-
     for (int j = 0; j < n; j++) {
-    	if (*(*(copyGrid + row) + j) == 'Q') {
-    		return false;
-    	}
+        if (*(*(copyGrid + row) + j) == 'Q') {
+            return false;
+        }
     }
-
     // check for attackers diagonally / \   //
-
     // check mid to bottem right
     int rowCheck = row;
     int colCheck = column;
     while(rowCheck != m && colCheck != n) {
-    	rowCheck++;
-    	colCheck++;
-    	if (rowCheck >= m) {
-    		break;
-    	}
-    	if (colCheck >= n) {
-    		break;
-    	}
-    	if (*(*(copyGrid + rowCheck) + colCheck) == 'Q') {
-    		return false;
-    	}
+        rowCheck++;
+        colCheck++;
+        if (rowCheck >= m) {
+            break;
+        }
+        if (colCheck >= n) {
+            break;
+        }
+        if (*(*(copyGrid + rowCheck) + colCheck) == 'Q') {
+            return false;
+        }
     }
-
-
     // check mid to top left
     rowCheck = row;
     colCheck = column;
     while(rowCheck != 0 && colCheck != 0) {
-    	rowCheck--;
-    	colCheck--;
-    	if (rowCheck < 0) {
-    		break;
-    	}
-    	if (colCheck < 0) {
-    		break;
-    	}
-    	if (*(*(copyGrid + rowCheck) + colCheck) == 'Q') {
-    		return false;
-    	}
+        rowCheck--;
+        colCheck--;
+        if (rowCheck < 0) {
+            break;
+        }
+        if (colCheck < 0) {
+            break;
+        }
+        if (*(*(copyGrid + rowCheck) + colCheck) == 'Q') {
+            return false;
+        }
     }
-
     // check mid to bottem left
     rowCheck = row;
     colCheck = column;
     while(rowCheck != m && colCheck != 0) {
-    	rowCheck++;
-    	colCheck--;
-    	if (rowCheck >= m) {
-    		break;
-    	}
-    	if (colCheck < 0) {
-    		break;
-    	}
-    	if (*(*(copyGrid + rowCheck) + colCheck) == 'Q') {
-    		return false;
-    	}
+        rowCheck++;
+        colCheck--;
+        if (rowCheck >= m) {
+            break;
+        }
+        if (colCheck < 0) {
+            break;
+        }
+        if (*(*(copyGrid + rowCheck) + colCheck) == 'Q') {
+            return false;
+        }
     }
     // check mid to top right
     rowCheck = row;
     colCheck = column;
     while(rowCheck != 0 && colCheck != n) {
-    	rowCheck--;
-    	colCheck++;
-    	if (rowCheck < 0) {
-    		break;
-    	}
-    	if (colCheck >= n) {
-    		break;
-    	}
-    	if (*(*(copyGrid + rowCheck) + colCheck) == 'Q') {
-    		return false;
-    	}
+        rowCheck--;
+        colCheck++;
+        if (rowCheck < 0) {
+            break;
+        }
+        if (colCheck >= n) {
+            break;
+        }
+        if (*(*(copyGrid + rowCheck) + colCheck) == 'Q') {
+            return false;
+        }
     }
     return true;
 
 }
 
-void SolutionFinder(char** grid, int row, int m, int n, int solutions, int pipefd[2]){
+void SolutionFinder(char** grid, int row, int m, int n, int solutions, int pipefd[2]
+    , pid_t* child_pids){
+    
     if (row == m) {
         solutions++; 
         printf("P%d: Found a solution; notifying top-level parent\n", getpid());
@@ -128,10 +118,47 @@ void SolutionFinder(char** grid, int row, int m, int n, int solutions, int pipef
             if (child_pid == -1) {
                 perror("fork");
                 exit(EXIT_FAILURE);
-            } else if (child_pid == 0) {
+            } else if (child_pid == 0) {    /* CHILD PROCESS */
                 *(*(grid + row) + i) = 'Q';
-                SolutionFinder(grid, row + 1, m, n, solutions, pipefd);
+
+                printf("Board configuration:\n");
+                for (int i = 0; i < m; i++) {
+                    for (int j = 0; j < n; j++) {
+                        if (grid[i][j])
+                            printf("Q ");
+                        else
+                            printf("- ");
+                    }
+                    printf("\n");
+                }
+
+                printf("\\\\\\\\\\\\\\\\\\\\\\\n");
+
+
+                SolutionFinder(grid, row + 1, m, n, solutions, pipefd, child_pids);
                 exit(EXIT_SUCCESS);
+           
+            } 
+            else 
+            {    /* PARENT PROCESS */
+                int status;
+                waitpid(child_pid, &status, 0);
+                if (child_pid == -1) {
+                    perror("Failed to wait for child process");
+                    exit(EXIT_FAILURE);
+                }
+
+                if (WIFSIGNALED(status)) /* child process was terminated   */
+                {                        /*  by a signal (e.g., seg fault) */
+                    printf("PARENT: child process killed by a signal\n");
+                    return EXIT_FAILURE;
+                }
+                else if (WIFEXITED(status))
+                {
+                    int exit_status = WEXITSTATUS(status);
+                    printf("PARENT: heat in %d\n", exit_status);
+                    //return exit_status;
+                }
             }
         }
     }
@@ -147,7 +174,9 @@ void SolutionFinder(char** grid, int row, int m, int n, int solutions, int pipef
 
 int main(int argc, char **argv)
 {
-	if (argc != 3) {
+    fflush(stdout);
+    
+    if (argc != 3) {
         fprintf(stderr, "ERROR: Invalid argument(s)\n");
         fprintf(stderr, "USAGE: hw2.out <m> <n>\n");
         return EXIT_FAILURE;
@@ -157,35 +186,42 @@ int main(int argc, char **argv)
     int n = atoi(*(++argv)); // columns
 
     printf("P%d: Solving the (%d,%d)-Queens problem for a %dx%d board\n", getpid(), m, n, m, n);
- 	
- 	// create grid
+    
+    // create grid
     char** grid = (char**)calloc(m, sizeof(char*));
     for (int i = 0; i < m; i++) {
-    	*(grid+i) = (char*)calloc(n, sizeof(char));
+        *(grid+i) = (char*)calloc(n, sizeof(char));
     }
 
-	int* pipefd = (int*)malloc(2 * sizeof(int));
+    int* pipefd = (int*)malloc(2 * sizeof(int));
 
-	if (pipe(pipefd) == -1) {
-        perror("pipe");
-        exit(EXIT_FAILURE);
+    /* create a pipe */
+    int rc = pipe( pipefd );
+
+    if ( rc == -1 )
+    {
+    perror( "pipe() failed" );
+    return EXIT_FAILURE;
     }
 
     // Dynamic array to store child process IDs
     pid_t* child_pids = NULL;
     int child_count = 0;
 
-    // the issue with solving it this way is that for second and third row, this problem
-    // will solve for the second row with an empty first row
+    pid_t top_level_parent_pid;
+    top_level_parent_pid = getpid();
 
-    // What are the safe guards I can put in place?
-
-    // Easier way: recursion until solution reached, or no solution reached
 
     int solutions = 0;
-    SolutionFinder(grid, 0, m, n, solutions, pipefd);
+    SolutionFinder(grid, 0, m, n, solutions, pipefd, child_pids);
 
-
+    for (int i = 0; i < child_count; i++) {
+        int status;
+        pid_t pid = waitpid(child_pids[i], &status, 0);
+        if (WIFEXITED(status)) {
+            printf("P%d: Search complete; only able to place %d Queens on a %dx%d board\n", pid, WEXITSTATUS(status), m, n);
+        }
+    }
 
     
 
