@@ -99,83 +99,62 @@ bool checkQueenPlacement(char** grid, int row, int column, int m, int n) {
 
 }
 
-void SolutionFinder(char** grid, int row, int m, int n, int solutions, int pipefd[2]
-    , pid_t* child_pids){
-    
+
+int SolutionFinder(char** grid, int row, int m, int n, int pipefd[2], int numQueens){
     if (row == m) {
-        solutions++; 
-        printf("P%d: Found a solution; notifying top-level parent\n", getpid());
-        // Notify the parent process through the pipe
-        close(pipefd[0]);  // Close the read end of the pipe
-        write(pipefd[1], solutions, sizeof(int));
-        close(pipefd[1]);  // Close the write end of the pipe
+        printf("P:%d: Found a solution; notifying top-level parent\n", getpid());
+        //Notify the parent process through the pipe
+        close(*(pipefd+0));  // Close the read end of the pipe
+        const char* message = "sky";
+        write(*(pipefd+1), message, 3 * sizeof(char));
+        close(*(pipefd+1 ));  // Close the write end of the pipe
         exit(EXIT_SUCCESS);
+        return numQueens;
     }
+
+    int numPlacements = 0;
     for (int i = 0; i < n; i++) {
         if (checkQueenPlacement(grid, row, i, m, n)) {
-            printf("P%d: 1 possible move at row #%d; creating 1 child process...\n", getpid(), row);
+            numPlacements++;
+        }
+    }
+    if (numPlacements > 0) {
+        printf("P%d: %d possible moves at row #%d; creating %d child processes...\n", getpid(), numPlacements, row, numPlacements);
+    }
+    else if (numPlacements == 0){
+        printf("P%d: Dead end at row #%d\n", getpid(), row);
+        close(*(pipefd+0));  // Close the read end of the pipe
+        write(*(pipefd+1), &numQueens, sizeof(int));
+        close(*(pipefd+1));  // Close the write end of the pipe
+        exit(EXIT_SUCCESS);
+        return numQueens;
+    }
+
+    for (int i = 0; i < n; i++) {
+        if (checkQueenPlacement(grid, row, i, m, n)) {
             pid_t child_pid = fork();
             if (child_pid == -1) {
                 perror("fork");
                 exit(EXIT_FAILURE);
-            } else if (child_pid == 0) {    /* CHILD PROCESS */
+            } else if (child_pid == 0) {
                 *(*(grid + row) + i) = 'Q';
-
-                printf("Board configuration:\n");
-                for (int i = 0; i < m; i++) {
-                    for (int j = 0; j < n; j++) {
-                        if (grid[i][j])
-                            printf("Q ");
-                        else
-                            printf("- ");
-                    }
-                    printf("\n");
-                }
-
-                printf("\\\\\\\\\\\\\\\\\\\\\\\n");
-
-
-                SolutionFinder(grid, row + 1, m, n, solutions, pipefd, child_pids);
-                exit(EXIT_SUCCESS);
-           
-            } 
-            else 
-            {    /* PARENT PROCESS */
-                int status;
-                waitpid(child_pid, &status, 0);
-                if (child_pid == -1) {
-                    perror("Failed to wait for child process");
-                    exit(EXIT_FAILURE);
-                }
-
-                if (WIFSIGNALED(status)) /* child process was terminated   */
-                {                        /*  by a signal (e.g., seg fault) */
-                    printf("PARENT: child process killed by a signal\n");
-                    return EXIT_FAILURE;
-                }
-                else if (WIFEXITED(status))
-                {
-                    int exit_status = WEXITSTATUS(status);
-                    printf("PARENT: heat in %d\n", exit_status);
-                    //return exit_status;
-                }
+                numQueens++;
+                SolutionFinder(grid, row + 1, m, n, pipefd, numQueens);
+                //exit(EXIT_SUCCESS);
             }
         }
     }
 
-    // dead end spot
-    printf("P%d: Dead end at row #%d\n", getpid(), row);
-    exit(EXIT_SUCCESS);
+    
 
 
 
 }
 
-
 int main(int argc, char **argv)
 {
     fflush(stdout);
-    
+
     if (argc != 3) {
         fprintf(stderr, "ERROR: Invalid argument(s)\n");
         fprintf(stderr, "USAGE: hw2.out <m> <n>\n");
@@ -185,6 +164,9 @@ int main(int argc, char **argv)
     int m = atoi(*(++argv)); // rows
     int n = atoi(*(++argv)); // columns
 
+    
+
+
     printf("P%d: Solving the (%d,%d)-Queens problem for a %dx%d board\n", getpid(), m, n, m, n);
     
     // create grid
@@ -193,42 +175,79 @@ int main(int argc, char **argv)
         *(grid+i) = (char*)calloc(n, sizeof(char));
     }
 
-    int* pipefd = (int*)malloc(2 * sizeof(int));
+    int* pipefd = (int*)calloc(2, sizeof(int));
 
     /* create a pipe */
     int rc = pipe( pipefd );
-
     if ( rc == -1 )
     {
     perror( "pipe() failed" );
     return EXIT_FAILURE;
     }
 
-    // Dynamic array to store child process IDs
-    pid_t* child_pids = NULL;
-    int child_count = 0;
-
-    pid_t top_level_parent_pid;
-    top_level_parent_pid = getpid();
-
-
+    pid_t * pids = calloc( n, sizeof( pid_t ) );
+    bool solutionFound = false;
+    int maxQueens = 0;
+    int total = 0;
     int solutions = 0;
-    SolutionFinder(grid, 0, m, n, solutions, pipefd, child_pids);
-
-    for (int i = 0; i < child_count; i++) {
-        int status;
-        pid_t pid = waitpid(child_pids[i], &status, 0);
-        if (WIFEXITED(status)) {
-            printf("P%d: Search complete; only able to place %d Queens on a %dx%d board\n", pid, WEXITSTATUS(status), m, n);
+    for (int i = 0; i < n; i++) {
+        if (checkQueenPlacement(grid, 0, i, m, n)) {
+            solutions++;
         }
+    }
+    if (solutions > 0) {
+        printf("P%d: %d possible moves at row #0; creating %d child processes...\n", getpid(), solutions, solutions);
+        for (int i = 0; i < n; i++) {
+            if (checkQueenPlacement(grid, 0, i, m, n)) {
+                pid_t child_pid = fork();
+                if (child_pid == -1)
+                {
+                    perror("fork() failed");
+                    return EXIT_FAILURE;
+                }
+                if (child_pid == 0) {       // Child Process
+                    // place Q down
+                    *(*(grid + 0) + i) = 'Q';
+                    maxQueens = SolutionFinder(grid, 0 + 1, m, n, rc, 1);
+                    exit(maxQueens);
+                }
+                else {                      // Parent Process
+                    int status;
+                    waitpid(child_pid, &status, 0);
+                    if (WIFEXITED(status)) {
+                        int childExitStatus = WEXITSTATUS(status);
+                        if (childExitStatus == atoi("sky")) {
+                            total+=1;
+                            solutionFound = true;
+                        }
+                        else {
+                            if (childExitStatus > maxQueens) {
+                                maxQueens = childExitStatus;
+                            }
+                        }
+                    }
+                }
+
+            }
+                
+        }
+    
+    }
+
+
+    else {
+        printf("P%d: Dead end at row #0\n");
+    }
+    if (solutionFound == false) {
+        printf("P%d: Search complete; only able to place %d Queens on a %dx%d board\n", getpid(), maxQueens, m, n);
+    }
+    else if (solutionFound == true) {
+        printf("P%d: Search complete; found %d solutions for a %dx%d board\n", getpid(), total, m, n);
     }
 
     
 
-
-
-
-
+    
 
 
     for (int i = 0; i < m; i++) {
