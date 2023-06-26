@@ -126,17 +126,20 @@ bool checkQueenPlacement(char** grid, int row, int column, int m, int n) {
     return true;
 
 }
-
+//#ifndef QUIET
 
 int SolutionFinder(char** grid, int row, int m, int n, int* pipefd, int numQueens){
     if (row == m) {
         printf("P%d: Found a solution; notifying top-level parent\n", getpid());
         //Notify the parent process through the pipe
-        int ArbitraryNum = -1;
+        int ArbitraryNum = -5;
+
+        int r;
         close(*(pipefd+0));  // Close the read end of the pipe
-        write(*(pipefd+1), &ArbitraryNum, sizeof(int));
-        close(*(pipefd+1 ));  // Close the write end of the pipe
-        exit(EXIT_SUCCESS);
+        r = write(*(pipefd+1), &ArbitraryNum, sizeof(ArbitraryNum));
+        //printf("AWDHAWIDUHAWDIUHAWD %d\n", r);
+        //close(*(pipefd+1 ));  // Close the write end of the pipe
+        //exit(EXIT_SUCCESS);
         return ArbitraryNum;
     }
 
@@ -151,10 +154,14 @@ int SolutionFinder(char** grid, int row, int m, int n, int* pipefd, int numQueen
     }
     else if (numPlacements == 0){
         printf("P%d: Dead end at row #%d\n", getpid(), row);
+        
+
         close(*(pipefd+0));  // Close the read end of the pipe
-        write(*(pipefd+1), &numQueens, sizeof(int));
-        close(*(pipefd+1));  // Close the write end of the pipe
-        exit(EXIT_SUCCESS);
+        int r;
+        r = write(*(pipefd+1), &numQueens, sizeof(numQueens));
+        //printf("OTHER BASE CASE TEST %d\n", r);
+        //close(*(pipefd+1));  // Close the write end of the pipe
+        //exit(EXIT_SUCCESS);
         return numQueens;
     }
 
@@ -167,16 +174,11 @@ int SolutionFinder(char** grid, int row, int m, int n, int* pipefd, int numQueen
             } else if (child_pid == 0) {
                 *(*(grid + row) + i) = 'Q';
                 numQueens++;
-                SolutionFinder(grid, row + 1, m, n, pipefd, numQueens);
-                //exit(EXIT_SUCCESS);
+                numQueens = SolutionFinder(grid, row + 1, m, n, pipefd, numQueens);
+                exit(numQueens);
             }
         }
     }
-
-    
-
-
-
 }
 
 int main(int argc, char **argv)
@@ -222,6 +224,7 @@ int main(int argc, char **argv)
             solutions++;
         }
     }
+    
     if (solutions > 0) {
         printf("P%d: %d possible moves at row #0; creating %d child processes...\n", getpid(), solutions, solutions);
         for (int i = 0; i < n; i++) {
@@ -243,14 +246,32 @@ int main(int argc, char **argv)
                     waitpid(child_pid, &status, 0);
                     if (WIFEXITED(status)) {
                         int childExitStatus = WEXITSTATUS(status);
-                        printf("checker %d\n", childExitStatus);
-                        if (childExitStatus == -1) {
-                            total+=1;
+                        //printf("checker %d\n", childExitStatus);
+                        int numQueens;  // if numQueens = -1, then a solution is found, else, it holds the num of queens
+                        
+                        //close(pipefd[1]);  // Close the write end of the pipe
+
+                        // Read from the pipe
+                        ssize_t bytesRead = read(pipefd[0], &numQueens, sizeof(numQueens));
+
+                        if (bytesRead == -1) {
+                            perror("read");
+                            // Handle the error
+                        } else if (bytesRead == 0) {
+                            // The write end of the pipe was closed, indicating the end of data
+                            //printf("No data available in the pipe.\n");
+                        } else {
+                            // Successfully read data from the pipe
+                            //printf("Read %zd bytes from the pipe. numQueens = %d\n", bytesRead, numQueens);
+                        }
+                        if (numQueens == -5) {
+                            printf("ACCESSED\n");
+                            total++;
                             solutionFound = true;
                         }
                         else {
                             if (childExitStatus > maxQueens) {
-                                maxQueens = childExitStatus;
+                                maxQueens = numQueens;
                             }
                         }
                     }
@@ -261,6 +282,10 @@ int main(int argc, char **argv)
         }
     
     }
+    
+    
+    
+
 
 
     else {
@@ -273,7 +298,8 @@ int main(int argc, char **argv)
         printf("P%d: Search complete; found %d solutions for a %dx%d board\n", getpid(), total, m, n);
     }
 
-    
+    close(pipefd[1]);
+
     for (int i = 0; i < m; i++) {
         free(*(grid+i));
     }
