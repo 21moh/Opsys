@@ -21,12 +21,20 @@ bool checkQueenPlacement(char** grid, int row, int column, int m, int n) {
     // check for attackers vertically |
     for (int i = 0; i < m; i++) {
         if (*(*(copyGrid + i) + column) == 'Q') {
+            for (int i = 0; i < m; i++) {
+                free(*(copyGrid + i));
+            }
+            free(copyGrid);
             return false;
         }
     }
     // check for attackers horizontally ---
     for (int j = 0; j < n; j++) {
         if (*(*(copyGrid + row) + j) == 'Q') {
+            for (int i = 0; i < m; i++) {
+                free(*(copyGrid + i));
+            }
+            free(copyGrid);
             return false;
         }
     }
@@ -44,6 +52,10 @@ bool checkQueenPlacement(char** grid, int row, int column, int m, int n) {
             break;
         }
         if (*(*(copyGrid + rowCheck) + colCheck) == 'Q') {
+            for (int i = 0; i < m; i++) {
+                free(*(copyGrid + i));
+            }
+            free(copyGrid);
             return false;
         }
     }
@@ -60,6 +72,10 @@ bool checkQueenPlacement(char** grid, int row, int column, int m, int n) {
             break;
         }
         if (*(*(copyGrid + rowCheck) + colCheck) == 'Q') {
+            for (int i = 0; i < m; i++) {
+                free(*(copyGrid + i));
+            }
+            free(copyGrid);
             return false;
         }
     }
@@ -76,6 +92,10 @@ bool checkQueenPlacement(char** grid, int row, int column, int m, int n) {
             break;
         }
         if (*(*(copyGrid + rowCheck) + colCheck) == 'Q') {
+            for (int i = 0; i < m; i++) {
+                free(*(copyGrid + i));
+            }
+            free(copyGrid);
             return false;
         }
     }
@@ -92,24 +112,32 @@ bool checkQueenPlacement(char** grid, int row, int column, int m, int n) {
             break;
         }
         if (*(*(copyGrid + rowCheck) + colCheck) == 'Q') {
+            for (int i = 0; i < m; i++) {
+                free(*(copyGrid + i));
+            }
+            free(copyGrid);
             return false;
         }
     }
+    for (int i = 0; i < m; i++) {
+    free(*(copyGrid + i));
+    }
+    free(copyGrid);
     return true;
 
 }
 
 
-int SolutionFinder(char** grid, int row, int m, int n, int pipefd[2], int numQueens){
+int SolutionFinder(char** grid, int row, int m, int n, int* pipefd, int numQueens){
     if (row == m) {
-        printf("P:%d: Found a solution; notifying top-level parent\n", getpid());
+        printf("P%d: Found a solution; notifying top-level parent\n", getpid());
         //Notify the parent process through the pipe
+        int ArbitraryNum = -1;
         close(*(pipefd+0));  // Close the read end of the pipe
-        const char* message = "sky";
-        write(*(pipefd+1), message, 3 * sizeof(char));
+        write(*(pipefd+1), &ArbitraryNum, sizeof(int));
         close(*(pipefd+1 ));  // Close the write end of the pipe
         exit(EXIT_SUCCESS);
-        return numQueens;
+        return ArbitraryNum;
     }
 
     int numPlacements = 0;
@@ -185,7 +213,6 @@ int main(int argc, char **argv)
     return EXIT_FAILURE;
     }
 
-    pid_t * pids = calloc( n, sizeof( pid_t ) );
     bool solutionFound = false;
     int maxQueens = 0;
     int total = 0;
@@ -208,7 +235,7 @@ int main(int argc, char **argv)
                 if (child_pid == 0) {       // Child Process
                     // place Q down
                     *(*(grid + 0) + i) = 'Q';
-                    maxQueens = SolutionFinder(grid, 0 + 1, m, n, rc, 1);
+                    maxQueens = SolutionFinder(grid, 0 + 1, m, n, pipefd, 1);
                     exit(maxQueens);
                 }
                 else {                      // Parent Process
@@ -216,7 +243,8 @@ int main(int argc, char **argv)
                     waitpid(child_pid, &status, 0);
                     if (WIFEXITED(status)) {
                         int childExitStatus = WEXITSTATUS(status);
-                        if (childExitStatus == atoi("sky")) {
+                        printf("checker %d\n", childExitStatus);
+                        if (childExitStatus == -1) {
                             total+=1;
                             solutionFound = true;
                         }
@@ -236,7 +264,7 @@ int main(int argc, char **argv)
 
 
     else {
-        printf("P%d: Dead end at row #0\n");
+        printf("P%d: Dead end at row #0\n", getpid());
     }
     if (solutionFound == false) {
         printf("P%d: Search complete; only able to place %d Queens on a %dx%d board\n", getpid(), maxQueens, m, n);
@@ -246,10 +274,6 @@ int main(int argc, char **argv)
     }
 
     
-
-    
-
-
     for (int i = 0; i < m; i++) {
         free(*(grid+i));
     }
