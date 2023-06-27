@@ -1,0 +1,85 @@
+Operating Systems Exam 1 Prep
+
+2a.
+
+one solution:
+
+PARENT: x is 2023
+PARENT 800: forked...
+PARENT 900: forked...
+CHILD: happy birthday to 900
+CHILD: 2041
+PARENT 800: child completed
+PARENT: 23
+
+second solution:
+
+PARENT: x is 2023
+PARENT 900: forked...
+PARENT 800: forked...
+CHILD: happy birthday to 900
+CHILD: 2041
+PARENT 800: child completed
+PARENT: 23
+
+third solution:
+
+PARENT: x is 2023
+PARENT 900: forked...
+CHILD: happy birthday to 900
+CHILD: 2041
+PARENT 800: child completed
+PARENT: 23
+PARENT: x is 2023
+PARENT 800: forked...
+
+fourth solution:
+
+PARENT: x is 2023
+PARENT 800: forked...
+CHILD: happy birthday to 900
+CHILD: 2041
+PARENT 800: child completed
+PARENT: 23
+PARENT: x is 2023
+PARENT 900: forked...
+
+
+2d.
+
+PARENT: x is 2023
+PARENT 800: forked...
+PARENT 900: forked...
+CHILD: happy birthday to 900
+CHILD: 2041
+PARENT 800: child completed
+PARENT: 23
+
+3a.
+
+(C)(IC)()
+(POLYTE)(POLYT)(NULL)
+(0.00)(.00)(2.718)
+
+
+
+
+5a.
+
+one solution
+
+HELLO
+==> 2
+WHAT?
+ERROR
+ABCD 800
+
+
+
+
+
+6a.
+
+PID 700: Wrote 26 bytes
+PID 800: Read [ABCDEFGHIJKLMNOP]
+PID 800: Read [QRSTUVWXYZ]
